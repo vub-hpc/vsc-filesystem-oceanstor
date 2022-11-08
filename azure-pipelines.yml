@@ -11,7 +11,7 @@ resources:
       type: github
       endpoint: Github_HPC-VUB
       name: vub-hpc/azure-pipelines-template
-      ref: refs/heads/vsc
+      ref: refs/heads/vsc2
     # add hpcugent/vsc-config repo
     - repository: vsc-config
       type: github
