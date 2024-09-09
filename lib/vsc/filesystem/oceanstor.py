@@ -42,13 +42,13 @@ from enum import Enum
 
 from ipaddress import IPv4Address, AddressValueError
 from socket import gethostbyname
+from urllib.request import HTTPError, HTTPSHandler, build_opener
 
 from vsc.config.base import DEFAULT_INODE_MAX, VO_INFIX, VSC, VscStorage
 from vsc.filesystem.posix import PosixOperations, PosixOperationError
 from vsc.utils import fancylogger
 from vsc.utils.patterns import Singleton
 from vsc.utils.rest import Client, RestClient
-from vsc.utils.py2vs3 import HTTPError, HTTPSHandler, build_opener, is_py2
 
 
 # REST API cannot handle white spaces between keys and values
@@ -1109,8 +1109,6 @@ class OceanStorOperations(with_metaclass(Singleton, PosixOperations)):
                 # Check NFS server IP
                 try:
                     server_ip_str = gethostbyname(server_address)
-                    if is_py2():
-                        server_ip_str = server_ip_str.decode("utf-8")
                     server_ip = IPv4Address(server_ip_str)
                 except AddressValueError:
                     errmsg = f"Error converting address of NFS server to an IPv4: {server_address}"
