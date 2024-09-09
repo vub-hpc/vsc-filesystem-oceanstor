@@ -27,8 +27,6 @@ Tests for the VSC OceanStor API.
 
 @author: Alex Domingo (Vrije Universiteit Brussel)
 """
-from __future__ import print_function
-
 import json
 import mock
 import vsc.filesystem.oceanstor as oceanstor
