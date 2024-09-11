@@ -274,21 +274,22 @@ def api_response_get_side_effect(url=None, *args):
     """
     response = {"data": []}
 
-    if "file_service/dtrees" in url:
-        response["data"] = {
-            "parent_dir": "/test",
-        }
-
     return (0, response)
 
 
-def api_response_dtree_side_effect(file_system_name=None, *args, **kwargs):
+def api_response_dtree_side_effect(id=None, file_system_name=None, *args, **kwargs):
     """
     Mock GET responses of file_service/drees depending on the filesystem name
     """
     response = {"data": []}
 
-    if file_system_name == "test":
+    if id:
+        response = {
+            "data": {
+                "parent_dir": "/test",
+            }
+        }
+    elif file_system_name == "test":
         response = API_RESPONSE["file_service.dtrees"]
 
     return (0, response)
