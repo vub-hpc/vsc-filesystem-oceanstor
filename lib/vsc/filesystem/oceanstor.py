@@ -274,7 +274,7 @@ class OceanStorOperationError(PosixOperationError):
     pass
 
 
-class OceanStorOperations(PosixOperations,metaclass=Singleton):
+class OceanStorOperations(PosixOperations, metaclass=Singleton):
     def __init__(self, url, account, username, password):
         """
         Initialize REST client and request authentication token
