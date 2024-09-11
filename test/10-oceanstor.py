@@ -386,10 +386,7 @@ def api_response_bucket_exists_side_effect(body, **kwargs):
 
     # Permission to access object API is always granted in mocks
     # Namespaces with ID < 20 are not buckets
-    if int(namespace_id) < 20:
-        is_bucket = False
-    else:
-        is_bucket = True
+    is_bucket = int(namespace_id) >= 20
 
     response["data"] = {"bucket_exists": is_bucket}
 
