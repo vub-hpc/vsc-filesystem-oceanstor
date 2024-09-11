@@ -810,7 +810,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
 
             # REST API does not accept multiple names in the filter of 'file_service/dtrees'
             # Therefore, we filter from cached data
-            for fs in dtree_filesets.keys():
+            for fs in dtree_filesets:
                 dtree_filesets[fs] = {
                     dt: dtree_filesets[fs][dt]
                     for dt in dtree_filesets[fs]
