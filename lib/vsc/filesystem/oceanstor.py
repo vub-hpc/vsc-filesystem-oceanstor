@@ -32,20 +32,17 @@ import os
 import re
 import ssl
 import time
-
 from collections import namedtuple
 from enum import Enum
-
-from ipaddress import IPv4Address, AddressValueError
+from ipaddress import AddressValueError, IPv4Address
 from socket import gethostbyname
 from urllib.request import HTTPError, HTTPSHandler, build_opener
 
 from vsc.config.base import DEFAULT_INODE_MAX, VO_INFIX, VSC, VscStorage
-from vsc.filesystem.posix import PosixOperations, PosixOperationError
+from vsc.filesystem.posix import PosixOperationError, PosixOperations
 from vsc.utils import fancylogger
 from vsc.utils.patterns import Singleton
 from vsc.utils.rest import Client, RestClient
-
 
 # REST API cannot handle white spaces between keys and values
 OCEANSTOR_JSON_SEP = (",", ":")
