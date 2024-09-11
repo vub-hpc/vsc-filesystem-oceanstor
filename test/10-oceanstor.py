@@ -282,7 +282,7 @@ def api_response_get_side_effect(url=None, *args):
     return (0, response)
 
 
-def api_response_dtree_side_effect(file_system_name=None, *args):
+def api_response_dtree_side_effect(file_system_name=None, *args, **kwargs):
     """
     Mock GET responses of file_service/drees depending on the filesystem name
     """
