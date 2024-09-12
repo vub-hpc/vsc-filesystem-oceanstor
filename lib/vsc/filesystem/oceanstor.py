@@ -1,5 +1,5 @@
 #
-# Copyright 2022-2023 Vrije Universiteit Brussel
+# Copyright 2022-2024 Vrije Universiteit Brussel
 #
 # This file is part of vsc-filesystem-oceanstor,
 # originally created by the HPC team of Vrije Universiteit Brussel (https://hpc.vub.be),
@@ -27,29 +27,22 @@ Interface for Huawei Pacific OceanStor
 
 @author: Alex Domingo (Vrije Universiteit Brussel)
 """
-
-from __future__ import print_function
-from future.utils import with_metaclass
-
 import json
 import os
 import re
 import ssl
 import time
-
 from collections import namedtuple
 from enum import Enum
-
-from ipaddress import IPv4Address, AddressValueError
+from ipaddress import AddressValueError, IPv4Address
 from socket import gethostbyname
 from urllib.request import HTTPError, HTTPSHandler, build_opener
 
 from vsc.config.base import DEFAULT_INODE_MAX, VO_INFIX, VSC, VscStorage
-from vsc.filesystem.posix import PosixOperations, PosixOperationError
+from vsc.filesystem.posix import PosixOperationError, PosixOperations
 from vsc.utils import fancylogger
 from vsc.utils.patterns import Singleton
 from vsc.utils.rest import Client, RestClient
-
 
 # REST API cannot handle white spaces between keys and values
 OCEANSTOR_JSON_SEP = (",", ":")
@@ -144,7 +137,7 @@ class OceanStorClient(Client):
 
     def __init__(self, *args, **kwargs):
         """Wrapper for Client.__init__() allowing to disable SSL certificate verification"""
-        super(OceanStorClient, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # X-Auth-Token header
         self.x_auth_header = None
@@ -167,7 +160,7 @@ class OceanStorClient(Client):
         """
         # GET query without pagination
         if pagination is False:
-            return super(OceanStorClient, self).get(url, headers=headers, **params)
+            return super().get(url, headers=headers, **params)
 
         # GET query with pagination
         query_range = {
@@ -182,7 +175,7 @@ class OceanStorClient(Client):
         while page_items == query_range["limit"]:
             # loop over pages
             params["range"] = json.dumps(query_range, separators=OCEANSTOR_JSON_SEP)
-            item_status, item_response = super(OceanStorClient, self).get(url, headers=headers, **params)
+            item_status, item_response = super().get(url, headers=headers, **params)
 
             # append page
             status = item_status
@@ -209,7 +202,7 @@ class OceanStorClient(Client):
 
         # Execute request catching any HTTPerror
         try:
-            status, response = super(OceanStorClient, self).request(method, url, body, headers, content_type)
+            status, response = super().request(method, url, body, headers, content_type)
         except HTTPError as err:
             errmsg = f"OceanStor query failed with HTTP error: {err.reason} ({err.code})"
             fancylogger.getLogger().error(errmsg)
@@ -281,7 +274,7 @@ class OceanStorOperationError(PosixOperationError):
     pass
 
 
-class OceanStorOperations(with_metaclass(Singleton, PosixOperations)):
+class OceanStorOperations(PosixOperations, metaclass=Singleton):
     def __init__(self, url, account, username, password):
         """
         Initialize REST client and request authentication token
@@ -291,7 +284,7 @@ class OceanStorOperations(with_metaclass(Singleton, PosixOperations)):
         @type username: string with username for the REST API
         @type password: string with plain password for the REST API
         """
-        super(OceanStorOperations, self).__init__()
+        super().__init__()
 
         self.supportedfilesystems = ["nfs", "nfs4"]
         self.ignorerealpathmismatch = True  # allow working through symlinks
@@ -817,7 +810,7 @@ class OceanStorOperations(with_metaclass(Singleton, PosixOperations)):
 
             # REST API does not accept multiple names in the filter of 'file_service/dtrees'
             # Therefore, we filter from cached data
-            for fs in dtree_filesets.keys():
+            for fs in dtree_filesets:
                 dtree_filesets[fs] = {
                     dt: dtree_filesets[fs][dt]
                     for dt in dtree_filesets[fs]
@@ -1081,7 +1074,7 @@ class OceanStorOperations(with_metaclass(Singleton, PosixOperations)):
         Identify local NFS filesystems from OceanStor
         Set filesystem name in OceanStor as attribute of local filesystems
         """
-        super(OceanStorOperations, self)._local_filesystems()
+        super()._local_filesystems()
 
         if self.oceanstor_filesystems is None:
             self.list_filesystems()

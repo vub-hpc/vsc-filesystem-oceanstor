@@ -1,5 +1,5 @@
 #
-# Copyright 2022-2023 Vrije Universiteit Brussel
+# Copyright 2022-2024 Vrije Universiteit Brussel
 #
 # This file is part of vsc-filesystem-oceanstor,
 # originally created by the HPC team of Vrije Universiteit Brussel (https://hpc.vub.be),
@@ -27,8 +27,6 @@ Tests for the VSC OceanStor API.
 
 @author: Alex Domingo (Vrije Universiteit Brussel)
 """
-from __future__ import print_function
-
 import json
 import mock
 import vsc.filesystem.oceanstor as oceanstor
@@ -276,21 +274,22 @@ def api_response_get_side_effect(url=None, *args):
     """
     response = {"data": []}
 
-    if "file_service/dtrees" in url:
-        response["data"] = {
-            "parent_dir": "/test",
-        }
-
     return (0, response)
 
 
-def api_response_dtree_side_effect(file_system_name=None, *args):
+def api_response_dtree_side_effect(id=None, file_system_name=None, *args, **kwargs):
     """
     Mock GET responses of file_service/drees depending on the filesystem name
     """
     response = {"data": []}
 
-    if file_system_name == "test":
+    if id:
+        response = {
+            "data": {
+                "parent_dir": "/test",
+            }
+        }
+    elif file_system_name == "test":
         response = API_RESPONSE["file_service.dtrees"]
 
     return (0, response)
@@ -387,10 +386,7 @@ def api_response_bucket_exists_side_effect(body, **kwargs):
 
     # Permission to access object API is always granted in mocks
     # Namespaces with ID < 20 are not buckets
-    if int(namespace_id) < 20:
-        is_bucket = False
-    else:
-        is_bucket = True
+    is_bucket = int(namespace_id) >= 20
 
     response["data"] = {"bucket_exists": is_bucket}
 
