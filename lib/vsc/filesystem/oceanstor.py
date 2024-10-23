@@ -1544,7 +1544,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         else:
             return quotas
 
-    def _get_quota(self, who, obj, typ="user"):
+    def _get_quota(self, who, obj, typ=Typ2Param.USR.value):
         """
         Get quota information of a given local object.
         Return:
@@ -1620,7 +1620,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         self.log.debug(dbgmsg, parent_id, ", ".join(attached_quotas))
 
         # Filter user/group quotas by given uid/gid
-        if typ in ["user", "group"] and who is not None:
+        if typ in [Typ2Param.USR.value, Typ2Param.GRP.value] and who is not None:
             if who == "*":
                 # default quotas are cached in their own list
                 default_typ_quotas = self.oceanstor_defaultquotas[ostor_fs_name][typ]
@@ -1650,7 +1650,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
             username = self.vsc.uid_number_to_uid(user)
 
         quota_limits = {"soft": soft, "hard": hard, "inode_soft": inode_soft, "inode_hard": inode_hard}
-        self._set_quota(who=username, obj=obj, typ="user", **quota_limits)
+        self._set_quota(who=username, obj=obj, typ=Typ2Param.USR.value, **quota_limits)
 
     def set_group_quota(self, soft, group, obj=None, hard=None, inode_soft=None, inode_hard=None):
         """
@@ -1696,9 +1696,9 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         # User quotas in VOs are temporarily frozen to 100% of VO fileset quota
         if "brussel/vo" in fileset_path:
             # Update default user quota in this VO to 100% of fileset quota
-            self._set_quota(who="*", obj=fileset_path, typ="user", **quota_limits)
+            self._set_quota(who="*", obj=fileset_path, typ=Typ2Param.USR.value, **quota_limits)
 
-    def _set_quota(self, who, obj, typ="user", **kwargs):
+    def _set_quota(self, who, obj, typ=Typ2Param.USR.value, **kwargs):
         """
         Set quota on a given local object.
 
@@ -1750,7 +1750,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
             self.session.api.v2.file_service.fs_quota.put(body=query_params)
             self.log.info("Quota '%s' updated succesfully", quota_id)
 
-    def _new_quota_api(self, quota_parent, typ="user", who=None, **kwargs):
+    def _new_quota_api(self, quota_parent, typ=Typ2Param.USR.value, who=None, **kwargs):
         """
         Create new quota of given object in OceanStor
 
@@ -1774,7 +1774,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         query_params["parent_type"] = OCEANSTOR_QUOTA_PARENT_TYPE[parent_type]
         query_params["quota_type"] = QuotaType[typ].value
 
-        if typ in ["user", "group"]:
+        if typ in [Typ2Param.USR.value, Typ2Param.GRP.value]:
             # settings for user/group quotas
             if who is None:
                 errmsg = f"Cannot ser user/group quota on '{quota_parent}', account information missing."
@@ -1804,7 +1804,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         try:
             _, response = self.session.api.v2.file_service.fs_quota.post(body=query_params)
         except RuntimeError:
-            if typ == "user":
+            if typ == Typ2Param.USR.value:
                 warnmsg = (
                     "Creation of %s quota for '%s' in '%s' failed, but a default quota should be in place. Moving on."
                 )
@@ -1872,7 +1872,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         if username.isdigit():
             username = self.vsc.uid_number_to_uid(who)
 
-        self._set_grace(obj, "user", grace, who=username)
+        self._set_grace(obj, Typ2Param.USR.value, grace, who=username)
 
     def set_group_grace(self, obj, grace=0, who=None):
         """
@@ -1920,7 +1920,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         quota_parent, quotas = self._get_quota(who, obj, typ)
 
         if not quotas:
-            if typ == "user" and who is not None:
+            if typ == Typ2Param.USR.value and who is not None:
                 # User quotas might be missing, but a default quota should be in place
                 # TODO: remove whenever OceanStor allows creating quotas on non-empty filesets
                 dbgmsg = (
