@@ -28,9 +28,9 @@ Tests for the VSC OceanStor API.
 @author: Alex Domingo (Vrije Universiteit Brussel)
 """
 import json
-import mock
-import vsc.filesystem.oceanstor as oceanstor
+import unittest.mock as mock
 
+import vsc.filesystem.oceanstor as oceanstor
 from vsc.install.testing import TestCase
 
 FAKE_INIT_PARAMS = ("oceanstor.url", "oceanstor_account", "oceanstor_user", "oceanstor_secret")
@@ -416,7 +416,16 @@ class StorageTest(TestCase):
     session.api.v2.converged_service.snapshots.get.side_effect = api_response_namespace_snapshots_side_effect
     session.dfv.service.obsOSC.bucket_exists.post.side_effect = api_response_bucket_exists_side_effect
 
+
+    mock_options = mock.Mock()
+    mock_options.options.host_institute = "test_host_inst"
+    vsc_options = mock.Mock(return_value=mock_options)
+    mock_storage = {"test_host_inst": mock.MagicMock(items=[])}
+    vsc_storage = mock.Mock(return_value=mock_storage)
+
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_get_account_info(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         account_reference = {
@@ -431,6 +440,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O.get_account_info, "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_active_accounts(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         accounts_reference = [
@@ -441,6 +452,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_active_accounts(), accounts_reference)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_validate_accounts(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         accounts_reference = ["0", "0000000001", "0000000002"]
@@ -451,6 +464,8 @@ class StorageTest(TestCase):
         self.assertEqual(O._validate_accounts(["test","oceanstor_account", "nonexistent"]), ["0000000001", "0000000002"])
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_storage_pools(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         storagepools_reference = {
@@ -471,6 +486,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_storage_pools(update=True), storagepools_reference)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_namespaces(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
 
@@ -527,6 +544,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_namespaces(update=True), ns_ref_full)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_get_namespace_info(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         ns_test = {
@@ -539,6 +558,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O.get_namespace_info, "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_is_bucket(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O._is_bucket("test"), False)
@@ -546,6 +567,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O._is_bucket, "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_buckets(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
 
@@ -589,6 +612,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_buckets(update=True), ns_ref_full)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_filesystems(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
 
@@ -630,6 +655,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_filesystems(update=True), fs_reference)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_get_filesystem_info(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         fs_test = {
@@ -642,6 +669,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O.get_filesystem_info, "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_filesets(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         dt_test = {
@@ -711,6 +740,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.list_filesets(update=True), dt_reference)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_get_fileset_info(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         dt_test = {
@@ -733,6 +764,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.get_fileset_info("test", "100"), dt_users)
         self.assertEqual(O.get_fileset_info("test", "vsc100"), dt_users)
 
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_namespace_snapshots(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         snap_reference = ["SNAP_TEST_01", "SNAP_TEST_02"]
@@ -742,6 +775,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O.list_namespace_snapshots, "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_create_namespace_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.create_namespace_snapshot("object", "NEW_SNAPSHOT"), True)
@@ -751,6 +786,8 @@ class StorageTest(TestCase):
         )
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_delete_namespace_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.delete_namespace_snapshot("object", "SNAP_OBJ_01"), True)
@@ -760,6 +797,8 @@ class StorageTest(TestCase):
         )
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_snapshots(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         snap_reference = ["SNAP_TEST_01", "SNAP_TEST_02"]
@@ -771,6 +810,8 @@ class StorageTest(TestCase):
         self.assertRaises(oceanstor.OceanStorOperationError, O.list_snapshots, "test", "nonexistent")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_create_filesystem_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.create_filesystem_snapshot("test", "NEW_SNAPSHOT"), True)
@@ -784,6 +825,8 @@ class StorageTest(TestCase):
         self.assertEqual(O.create_filesystem_snapshot("test", "SNAP_TEST_01", filesets=["dttest"]), 0)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_delete_filesystem_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.delete_filesystem_snapshot("test", "SNAP_TEST_01"), True)
