@@ -112,6 +112,8 @@ StorageQuota = namedtuple(
 
 # Soft quota to hard quota factor
 OCEANSTOR_QUOTA_FACTOR = 1.05
+# VO fileset percentage of default user quota
+DEFAULT_VO_USER_QUOTA_PERCENTAGE = 0.5
 # Default quota grace period
 DEFAULT_GRACE_DAYS = 7
 # NFS lookup cache lifetime in seconds
@@ -305,9 +307,13 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         self.oceanstor_nfsservers = {}
 
         self.vsc = VSC()
-        self.vscstorage = VscStorage()
         self.vsc.get_vsc_options()
         self.host_institute = self.vsc.options.options.host_institute
+
+        vsc_storage = VscStorage()
+        self.vsc_storage = [
+            stor for stor in vsc_storage[self.host_institute].values() if stor.backend == LOCAL_FS_OCEANSTOR
+        ]
 
         # OceanStor API URL
 
@@ -1299,34 +1305,46 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
             # wait for NFS lookup cache to expire to be able to access new fileset
             time.sleep(NFS_LOOKUP_CACHE_TIME)
 
-        # Set default user quota on blocks soft limit and inodes hard limit from settings in VscStorage
-        # TODO: remove once OceanStor supports setting user quotas on non-empty filesets
+        # Set default quotas on blocks and inodes from settings in VscStorage
+        # - OceanStor cannot create quotas on non-empty filesets
+        # - VSC account page does not manage inode quotas
+        # - block quotas can be updated by sync scripts
         try:
             vsc_fileset_storage = [
-                stor
-                for stor in self.vscstorage[self.host_institute].values()
-                if stor.backend == LOCAL_FS_OCEANSTOR and dtree_fullpath.startswith(stor.backend_mount_point)
+                stor for stor in self.vsc_storage.values() if dtree_fullpath.startswith(stor.backend_mount_point)
             ][0]
         except IndexError:
             errmsg = f"Could not find VSC storage for new fileset '{ostor_dtree_name}' at: {ostor_parentdir}"
             self.log.raiseException(errmsg, OceanStorOperationError)
-        else:
-            if ostor_dtree_name[1:3] == VO_INFIX:
-                block_hard = vsc_fileset_storage.quota_vo
-                inode_hard = vsc_fileset_storage.quota_vo_inode
-            else:
-                block_hard = vsc_fileset_storage.quota_user
-                inode_hard = vsc_fileset_storage.quota_user_inode
 
-            block_hard *= 1024  # convert from kB to bytes
-            block_soft = int(block_hard // OCEANSTOR_QUOTA_FACTOR)
-            inode_soft = int(inode_hard // OCEANSTOR_QUOTA_FACTOR)
-            self.set_user_quota(
-                block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
+        if ostor_dtree_name[1:3] == VO_INFIX:
+            # VOs have a default global fileset quota
+            vo_block_hard = int(vsc_fileset_storage.quota_vo) * 1024  # convert from kB to bytes
+            vo_inode_hard = int(vsc_fileset_storage.quota_vo_inode)
+            vo_block_soft = int(vo_block_hard // OCEANSTOR_QUOTA_FACTOR)
+            vo_inode_soft = int(vo_inode_hard // OCEANSTOR_QUOTA_FACTOR)
+            self.set_fileset_quota(
+                vo_block_soft, dtree_fullpath, hard=vo_block_hard, inode_soft=vo_inode_soft, inode_hard=vo_inode_hard
             )
 
-            grace_time = DEFAULT_GRACE_DAYS * 24 * 3600
-            self.set_user_grace(dtree_fullpath, grace=grace_time, who="*")
+        if ostor_dtree_name[1:3] == VO_INFIX:
+            # VOs default user quota is percentage of total fileset quota
+            block_hard = int(vsc_fileset_storage.quota_vo * DEFAULT_VO_USER_QUOTA_PERCENTAGE)
+            inode_hard = int(vsc_fileset_storage.quota_vo_inode * DEFAULT_VO_USER_QUOTA_PERCENTAGE)
+        else:
+            # VSC_HOME/VSC_DATA filesets only use a default user quota (100% of total)
+            block_hard = int(vsc_fileset_storage.quota_user)
+            inode_hard = int(vsc_fileset_storage.quota_user_inode)
+
+        block_hard *= 1024  # convert from kB to bytes
+        block_soft = int(block_hard // OCEANSTOR_QUOTA_FACTOR)
+        inode_soft = int(inode_hard // OCEANSTOR_QUOTA_FACTOR)
+        self.set_user_quota(
+            block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
+        )
+
+        grace_time = DEFAULT_GRACE_DAYS * 24 * 3600
+        self.set_user_grace(dtree_fullpath, grace=grace_time, who="*")
 
     def make_fileset_api(self, fileset_name, filesystem_name, parent_dir="/"):
         """
@@ -1541,8 +1559,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
 
         if only_default:
             return default_quotas
-        else:
-            return quotas
+        return quotas
 
     def _get_quota(self, who, obj, typ=Typ2Param.USR.value):
         """
