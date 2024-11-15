@@ -814,22 +814,22 @@ class StorageTest(TestCase):
         # default user quota always set
         self.assertTrue(O.set_user_quota.called)
         # call args: block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
-        call = O.set_user_quota.call_args
-        block_soft, star = call.args
+        call_args, call_kwargs = O.set_user_quota.call_args
+        block_soft, star = call_args
         self.assertEqual(block_soft, int(128*1024/1.05))
         self.assertEqual(star, "*")
-        self.assertEqual(call.kwargs["obj"], fs_path)
-        self.assertEqual(call.kwargs["hard"], 128*1024)
-        self.assertEqual(call.kwargs["inode_soft"], int(1024/1.05))
-        self.assertEqual(call.kwargs["inode_hard"], 1024)
+        self.assertEqual(call_kwargs["obj"], fs_path)
+        self.assertEqual(call_kwargs["hard"], 128*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(1024/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 1024)
         # user quota grace always set
         self.assertTrue(O.set_user_grace.called)
         # call args: dtree_fullpath, grace=grace_time, who="*"
-        call = O.set_user_grace.call_args
-        full_path, = call.args
+        call_args, call_kwargs = O.set_user_grace.call_args
+        full_path, = call_args
         self.assertEqual(full_path, fs_path)
-        self.assertEqual(call.kwargs["grace"], 604800)
-        self.assertEqual(call.kwargs["who"], "*")
+        self.assertEqual(call_kwargs["grace"], 604800)
+        self.assertEqual(call_kwargs["who"], "*")
 
         # case 3: VO dtree does not exist
         fs_path = "/tmp/bvofileset"
@@ -840,30 +840,32 @@ class StorageTest(TestCase):
         # fileset quota always set for VO filesets
         self.assertTrue(O.set_fileset_quota.called)
         # call args: vo_block_soft,dtree_fullpath,hard=vo_block_hard,inode_soft=vo_inode_soft,inode_hard=vo_inode_hard
-        call = O.set_fileset_quota.call_args
-        block_soft, full_path = call.args
+        call_args, call_kwargs = O.set_fileset_quota.call_args
+        block_soft, full_path = call_args
         self.assertEqual(block_soft, int(256*1024/1.05))
         self.assertEqual(full_path, fs_path)
-        self.assertEqual(call.kwargs["hard"], 256*1024)
-        self.assertEqual(call.kwargs["inode_soft"], int(2048/1.05))
-        self.assertEqual(call.kwargs["inode_hard"], 2048)
-        # user quota always set
-        call = O.set_user_quota.call_args
+        self.assertEqual(call_kwargs["hard"], 256*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(2048/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 2048)
+        # default user quota always set
+        self.assertTrue(O.set_user_quota.called)
         # call args: block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
-        block_soft, star = call.args
+        call_args, call_kwargs = O.set_user_quota.call_args
+        block_soft, star = call_args
         self.assertEqual(block_soft, int(128*1024/1.05))
         self.assertEqual(star, "*")
-        self.assertEqual(call.kwargs["obj"], fs_path)
-        self.assertEqual(call.kwargs["hard"], 128*1024)
-        self.assertEqual(call.kwargs["inode_soft"], int(1024/1.05))
-        self.assertEqual(call.kwargs["inode_hard"], 1024)
+        self.assertEqual(call_kwargs["obj"], fs_path)
+        self.assertEqual(call_kwargs["hard"], 128*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(1024/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 1024)
         # user quota grace always set
-        call = O.set_user_grace.call_args
+        self.assertTrue(O.set_user_grace.called)
         # call args: dtree_fullpath, grace=grace_time, who="*"
-        full_path, = call.args
+        call_args, call_kwargs = O.set_user_grace.call_args
+        full_path, = call_args
         self.assertEqual(full_path, fs_path)
-        self.assertEqual(call.kwargs["grace"], 604800)
-        self.assertEqual(call.kwargs["who"], "*")
+        self.assertEqual(call_kwargs["grace"], 604800)
+        self.assertEqual(call_kwargs["who"], "*")
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
     @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
