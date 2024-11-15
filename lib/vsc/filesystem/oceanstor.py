@@ -316,13 +316,11 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         ]
 
         # OceanStor API URL
-
         # Initialize REST client without user/password
         self.log.info("URL of OceanStor REST API server: %s", url)
         self.session = OceanStorRestClient(url)
         # Get token for this session with user/password
         self.session.api.v2.client.get_x_auth_token(username, password)
-
         # Account details
         self.account = self.get_account_info(account)
         self.objapi_access = self._check_account_objapi_access()
@@ -1311,7 +1309,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         # - block quotas can be updated by sync scripts
         try:
             vsc_fileset_storage = [
-                stor for stor in self.vsc_storage.values() if dtree_fullpath.startswith(stor.backend_mount_point)
+                stor for stor in self.vsc_storage if dtree_fullpath.startswith(stor.backend_mount_point)
             ][0]
         except IndexError:
             errmsg = f"Could not find VSC storage for new fileset '{ostor_dtree_name}' at: {ostor_parentdir}"

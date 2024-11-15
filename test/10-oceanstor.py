@@ -34,7 +34,6 @@ import vsc.filesystem.oceanstor as oceanstor
 from vsc.install.testing import TestCase
 
 FAKE_INIT_PARAMS = ("oceanstor.url", "oceanstor_account", "oceanstor_user", "oceanstor_secret")
-
 API_RESPONSE = {
     "account.accounts": {
         "data": [
@@ -295,6 +294,15 @@ def api_response_dtree_side_effect(id=None, file_system_name=None, *args, **kwar
     return (0, response)
 
 
+def api_response_dtree_post_side_effect(body, **kwargs):
+    """
+    Mock POST responses of file_service/drees
+    """
+    response = {"data": {}}
+
+    return (0, response)
+
+
 def api_response_snapshots_side_effect(filter=None, *args, **kwargs):
     """
     Mock GET responses of file_service/snapshots depending on filter
@@ -411,17 +419,25 @@ class StorageTest(TestCase):
     session.api.v2.get.side_effect = api_response_get_side_effect
     session.api.v2.account.accounts.get.side_effect = api_response_account_side_effect
     session.api.v2.file_service.dtrees.get.side_effect = api_response_dtree_side_effect
+    session.api.v2.file_service.dtrees.post.side_effect = api_response_dtree_post_side_effect
     session.api.v2.file_service.snapshots.get.side_effect = api_response_snapshots_side_effect
     session.api.v2.converged_service.namespaces.get.side_effect = api_response_namespaces_side_effect
     session.api.v2.converged_service.snapshots.get.side_effect = api_response_namespace_snapshots_side_effect
     session.dfv.service.obsOSC.bucket_exists.post.side_effect = api_response_bucket_exists_side_effect
 
-
+    # mock VscStorage
     mock_options = mock.Mock()
     mock_options.options.host_institute = "test_host_inst"
     vsc_options = mock.Mock(return_value=mock_options)
-    mock_storage = {"test_host_inst": mock.MagicMock(items=[])}
-    vsc_storage = mock.Mock(return_value=mock_storage)
+    mock_storage = mock.Mock()
+    mock_storage.backend = "oceanstor"
+    mock_storage.backend_mount_point = "/tmp"
+    mock_storage.quota_user = 128
+    mock_storage.quota_user_inode = 1024
+    mock_storage.quota_vo = 256
+    mock_storage.quota_vo_inode = 2048
+    mock_host_storage = {"test_host_inst": {"test_storage": mock_storage}}
+    vsc_storage = mock.Mock(return_value=mock_host_storage)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
     @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
@@ -764,6 +780,94 @@ class StorageTest(TestCase):
         self.assertEqual(O.get_fileset_info("test", "100"), dt_users)
         self.assertEqual(O.get_fileset_info("test", "vsc100"), dt_users)
 
+    @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
+    @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
+    @mock.patch("vsc.config.base.VscOptions", vsc_options)
+    def test_make_fileset(self):
+        O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
+
+        # mock filesystem
+        fs_id = "10"
+        O.list_nfs_shares = mock.Mock(return_value={"test": {0: "Mock NFS in tmp"}})
+        O.what_filesystem = mock.Mock(return_value="test")
+
+        # not interested in testing quota methods here
+        O.set_fileset_quota = mock.Mock()
+        O.set_user_quota = mock.Mock()
+        O.set_user_grace = mock.Mock()
+
+        # case 1: dtree already exists
+        fs_path = "/tmp/newfileset"
+        O._sanity_check = mock.Mock(return_value=fs_path)
+        dtree_id = 1
+        O._identify_local_path = mock.Mock(return_value=(fs_id, str(dtree_id), None, "/test"))
+        self.assertRaises(oceanstor.OceanStorOperationError, O.make_fileset, fs_path)
+
+        # case 2: user dtree does not exist
+        fs_path = "/tmp/newfileset"
+        O._sanity_check = mock.Mock(return_value=fs_path)
+        dtree_id = 0
+        O._identify_local_path = mock.Mock(return_value=(fs_id, str(dtree_id), None, "/test"))
+        O.make_fileset(fs_path)
+        # fileset quota only set for VO filesets
+        self.assertFalse(O.set_fileset_quota.called)
+        # default user quota always set
+        self.assertTrue(O.set_user_quota.called)
+        # call args: block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
+        call_args, call_kwargs = O.set_user_quota.call_args
+        block_soft, star = call_args
+        self.assertEqual(block_soft, int(128*1024/1.05))
+        self.assertEqual(star, "*")
+        self.assertEqual(call_kwargs["obj"], fs_path)
+        self.assertEqual(call_kwargs["hard"], 128*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(1024/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 1024)
+        # user quota grace always set
+        self.assertTrue(O.set_user_grace.called)
+        # call args: dtree_fullpath, grace=grace_time, who="*"
+        call_args, call_kwargs = O.set_user_grace.call_args
+        full_path, = call_args
+        self.assertEqual(full_path, fs_path)
+        self.assertEqual(call_kwargs["grace"], 604800)
+        self.assertEqual(call_kwargs["who"], "*")
+
+        # case 3: VO dtree does not exist
+        fs_path = "/tmp/bvofileset"
+        O._sanity_check = mock.Mock(return_value=fs_path)
+        dtree_id = 0
+        O._identify_local_path = mock.Mock(return_value=(fs_id, str(dtree_id), None, "/test"))
+        O.make_fileset(fs_path)
+        # fileset quota always set for VO filesets
+        self.assertTrue(O.set_fileset_quota.called)
+        # call args: vo_block_soft,dtree_fullpath,hard=vo_block_hard,inode_soft=vo_inode_soft,inode_hard=vo_inode_hard
+        call_args, call_kwargs = O.set_fileset_quota.call_args
+        block_soft, full_path = call_args
+        self.assertEqual(block_soft, int(256*1024/1.05))
+        self.assertEqual(full_path, fs_path)
+        self.assertEqual(call_kwargs["hard"], 256*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(2048/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 2048)
+        # default user quota always set
+        self.assertTrue(O.set_user_quota.called)
+        # call args: block_soft, "*", obj=dtree_fullpath, hard=block_hard, inode_soft=inode_soft, inode_hard=inode_hard
+        call_args, call_kwargs = O.set_user_quota.call_args
+        block_soft, star = call_args
+        self.assertEqual(block_soft, int(128*1024/1.05))
+        self.assertEqual(star, "*")
+        self.assertEqual(call_kwargs["obj"], fs_path)
+        self.assertEqual(call_kwargs["hard"], 128*1024)
+        self.assertEqual(call_kwargs["inode_soft"], int(1024/1.05))
+        self.assertEqual(call_kwargs["inode_hard"], 1024)
+        # user quota grace always set
+        self.assertTrue(O.set_user_grace.called)
+        # call args: dtree_fullpath, grace=grace_time, who="*"
+        call_args, call_kwargs = O.set_user_grace.call_args
+        full_path, = call_args
+        self.assertEqual(full_path, fs_path)
+        self.assertEqual(call_kwargs["grace"], 604800)
+        self.assertEqual(call_kwargs["who"], "*")
+
+    @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
     @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
     @mock.patch("vsc.config.base.VscOptions", vsc_options)
     def test_list_namespace_snapshots(self):
