@@ -2059,13 +2059,13 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         try:
             _, response = self.session.api.v2.converged_service.snapshots.post(body=query_params)
         except RuntimeError as err:
-            msg, code, desc = err.args[0]
-            if code == 33656849:
+            err_code = err.args[0][1]
+            if err_code == 33656849:
                 self.log.error(
                     f"Cannot create snapshot, snapshot with name '{snap_name}' "
                     f"already exists for namespace '{namespace}'!"
                 )
-            elif code == 33566737:
+            elif err_code == 33566737:
                 self.log.error(f"Cannot create snapshot, namespace '{namespace}' does not exist!")
             else:
                 raise err
@@ -2095,13 +2095,13 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         try:
             _, response = self.session.api.v2.converged_service.snapshots.delete(body=query_params)
         except RuntimeError as err:
-            msg, code, desc = err.args[0]
-            if code == 33656855:
+            err_code = err.args[0][1]
+            if err_code == 33656855:
                 self.log.error(
                     f"Cannot delete snapshot, snapshot with name '{snap_name}' "
                     f"does not exist for namespace '{namespace}'!"
                 )
-            elif code == 33566737:
+            elif err_code == 33566737:
                 self.log.error(f"Cannot delete snapshot, namespace '{namespace}' does not exist!")
             else:
                 raise err
