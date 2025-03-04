@@ -2091,7 +2091,34 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: string representing the name of the namespace
         @type snap_name: string representing the name of the new snapshot
         """
-        return self._converged_service_snapshot_api(snap_name, namespace)
+        query_params = {
+            "name": str(snap_name),
+            "namespace_name": namespace,
+        }
+
+        if self.dry_run:
+            self.log.info(f"(dryrun) Snapshot creation query parameters: {query_params}")
+            return True
+
+        try:
+            _, response = self.session.api.v2.converged_service.snapshots.post(body=query_params)
+        except RuntimeError as err:
+            msg, code, desc = err.args[0]
+            if code == 33656849:
+                self.log.error(
+                    f"Cannot create snapshot, snapshot with name '{snap_name}' "
+                    f"already exists for namespace '{namespace}'!"
+                )
+            elif code == 33566737:
+                self.log.error(f"Cannot create snapshot, namespace '{namespace}' does not exist!")
+            else:
+                raise err
+        else:
+            new_snap_id = response["data"]["id"]
+            infomsg = "New snapshot '%s' of namespace %s created successfully with ID: %s"
+            self.log.info(infomsg, snap_name, namespace, new_snap_id)
+
+        return True
 
     def delete_namespace_snapshot(self, namespace, snap_name):
         """
