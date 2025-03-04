@@ -1,5 +1,5 @@
 #
-# Copyright 2022-2024 Vrije Universiteit Brussel
+# Copyright 2022-2025 Vrije Universiteit Brussel
 #
 # This file is part of vsc-filesystem-oceanstor,
 # originally created by the HPC team of Vrije Universiteit Brussel (https://hpc.vub.be),
@@ -233,11 +233,11 @@ class OceanStorClient(Client):
             if "suggestion" in result:
                 ec_msg_desc += " " + result["suggestion"]
 
-        ec_full_msg = f"OceanStor query returned exit code: {exit_code} ({ec_msg_desc})"
         if exit_code != 0:
-            fancylogger.getLogger().raiseException(ec_full_msg, exception=RuntimeError)
+            err_msg = "OceanStor query returned non-zero exit code"
+            fancylogger.getLogger().raiseException((err_msg, exit_code, ec_msg_desc), exception=RuntimeError)
         else:
-            fancylogger.getLogger().debug(ec_full_msg)
+            fancylogger.getLogger().debug(f"OceanStor query is successful: {exit_code} ({ec_msg_desc})")
 
         return status, response
 
@@ -348,9 +348,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         """
         _, response = self.session.api.v2.account.accounts.get(pagination=True)
 
-        accounts = [(acc["name"], acc["id"]) for acc in response["data"] if acc["status"] == "Active"]
-
-        return accounts
+        return [(acc["name"], acc["id"]) for acc in response["data"] if acc["status"] == "Active"]
 
     def _validate_accounts(self, accounts):
         """
@@ -365,9 +363,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         elif not isinstance(accounts, list):
             accounts = [accounts]
 
-        valid_accounts = [acc[1] for acc in active_accounts if acc[0] in accounts]
-
-        return valid_accounts
+        return [acc[1] for acc in active_accounts if acc[0] in accounts]
 
     def _check_account_objapi_access(self):
         """
@@ -2042,51 +2038,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         filter_json = json.dumps([filter_json], separators=OCEANSTOR_JSON_SEP)
         _, response = self.session.api.v2.converged_service.snapshots.get(pagination=True, filter=filter_json)
 
-        snapshots = [snap["name"] for snap in response["data"]]
-
-        return snapshots
-
-    def _converged_service_snapshot_api(self, snap_name, namespace, delete=False):
-        """
-        Create or delete a namespace snapshot in OceanStor
-
-        @type snap_name: string representing the name of the new snapshot
-        @type namespace: name of the namespace of the new snapshot
-        @type delete: boolean to switch between creation/deletion of snapshots
-        """
-        snapshots = self.list_namespace_snapshots(namespace)
-
-        query_params = {
-            "name": str(snap_name),
-            "namespace_name": namespace,
-        }
-
-        if delete is True:
-            # DELETE query to delete snapshot
-            if snap_name not in snapshots:
-                self.log.error("Snapshot '%s' does not exist in namespace %s!", snap_name, namespace)
-                return 0
-            if self.dry_run:
-                self.log.info("(dryrun) Snapshot '%s' deletion query: %s", snap_name, query_params)
-            else:
-                _, response = self.session.api.v2.converged_service.snapshots.delete(body=query_params)
-                deletion_status = response["result"]["code"]
-                infomsg = "Snapshot '%s' of namespace %s deleted successfully (status: %s)"
-                self.log.info(infomsg, snap_name, namespace, deletion_status)
-        else:
-            # POST query to create snapshot
-            if snap_name in snapshots:
-                self.log.error("Snapshot '%s' already exists for namespace %s!", snap_name, namespace)
-                return 0
-            if self.dry_run:
-                self.log.info("(dryrun) New snapshot '%s' creation query: %s", snap_name, query_params)
-            else:
-                _, response = self.session.api.v2.converged_service.snapshots.post(body=query_params)
-                new_snap_id = response["data"]["id"]
-                infomsg = "New snapshot '%s' of namespace %s created successfully with ID: %s"
-                self.log.info(infomsg, snap_name, namespace, new_snap_id)
-
-        return True
+        return [snap["name"] for snap in response["data"]]
 
     def create_namespace_snapshot(self, namespace, snap_name):
         """
@@ -2095,9 +2047,34 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: string representing the name of the namespace
         @type snap_name: string representing the name of the new snapshot
         """
-        new_snap_status = self._converged_service_snapshot_api(snap_name, namespace)
+        query_params = {
+            "name": str(snap_name),
+            "namespace_name": namespace,
+        }
 
-        return new_snap_status
+        if self.dry_run:
+            self.log.info(f"(dryrun) Snapshot creation query parameters: {query_params}")
+            return True
+
+        try:
+            _, response = self.session.api.v2.converged_service.snapshots.post(body=query_params)
+        except RuntimeError as err:
+            err_code = err.args[0][1]
+            if err_code == 33656849:
+                self.log.error(
+                    f"Cannot create snapshot, snapshot with name '{snap_name}' "
+                    f"already exists for namespace '{namespace}'!"
+                )
+            elif err_code == 33566737:
+                self.log.error(f"Cannot create snapshot, namespace '{namespace}' does not exist!")
+            else:
+                raise err
+        else:
+            new_snap_id = response["data"]["id"]
+            infomsg = "New snapshot '%s' of namespace %s created successfully with ID: %s"
+            self.log.info(infomsg, snap_name, namespace, new_snap_id)
+
+        return True
 
     def delete_namespace_snapshot(self, namespace, snap_name):
         """
@@ -2106,9 +2083,34 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: name of the filesystem of the snapshot to delete
         @type snap_name: string representing the name of the snapshot to delete
         """
-        del_snap_status = self._converged_service_snapshot_api(snap_name, namespace, delete=True)
+        query_params = {
+            "name": str(snap_name),
+            "namespace_name": namespace,
+        }
 
-        return del_snap_status
+        if self.dry_run:
+            self.log.info(f"(dryrun) Snapshot deletion query parameters: {query_params}")
+            return True
+
+        try:
+            _, response = self.session.api.v2.converged_service.snapshots.delete(body=query_params)
+        except RuntimeError as err:
+            err_code = err.args[0][1]
+            if err_code == 33656855:
+                self.log.error(
+                    f"Cannot delete snapshot, snapshot with name '{snap_name}' "
+                    f"does not exist for namespace '{namespace}'!"
+                )
+            elif err_code == 33566737:
+                self.log.error(f"Cannot delete snapshot, namespace '{namespace}' does not exist!")
+            else:
+                raise err
+        else:
+            deletion_status = response["result"]["code"]
+            infomsg = "Snapshot '%s' of namespace %s deleted successfully (status: %s)"
+            self.log.info(infomsg, snap_name, namespace, deletion_status)
+
+        return True
 
     def list_snapshots(self, filesystem, fileset=None):
         """
@@ -2131,9 +2133,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         filter_json = json.dumps([filter_json], separators=OCEANSTOR_JSON_SEP)
         _, response = self.session.api.v2.file_service.snapshots.get(pagination=True, filter=filter_json)
 
-        snapshots = [snap["name"] for snap in response["data"]]
-
-        return snapshots
+        return [snap["name"] for snap in response["data"]]
 
     def _file_service_snapshot_api(self, snap_name, fs_name, fileset_name=None, delete=False):
         """
@@ -2224,9 +2224,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
             snapname = self._fileset_snapshot_name(fileset, snapname)
 
         # delete snapshot
-        del_snap_status = self._file_service_snapshot_api(snapname, fsname, fileset, delete=True)
-
-        return del_snap_status
+        return self._file_service_snapshot_api(snapname, fsname, fileset, delete=True)
 
     def _fileset_snapshot_name(self, fileset, snapshot_basename):
         """
