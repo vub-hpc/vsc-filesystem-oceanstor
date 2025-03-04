@@ -2127,7 +2127,34 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: name of the filesystem of the snapshot to delete
         @type snap_name: string representing the name of the snapshot to delete
         """
-        return self._converged_service_snapshot_api(snap_name, namespace, delete=True)
+        query_params = {
+            "name": str(snap_name),
+            "namespace_name": namespace,
+        }
+
+        if self.dry_run:
+            self.log.info(f"(dryrun) Snapshot deletion query parameters: {query_params}")
+            return True
+
+        try:
+            _, response = self.session.api.v2.converged_service.snapshots.delete(body=query_params)
+        except RuntimeError as err:
+            msg, code, desc = err.args[0]
+            if code == 33656855:
+                self.log.error(
+                    f"Cannot delete snapshot, snapshot with name '{snap_name}' "
+                    f"does not exist for namespace '{namespace}'!"
+                )
+            elif code == 33566737:
+                self.log.error(f"Cannot delete snapshot, namespace '{namespace}' does not exist!")
+            else:
+                raise err
+        else:
+            deletion_status = response["result"]["code"]
+            infomsg = "Snapshot '%s' of namespace %s deleted successfully (status: %s)"
+            self.log.info(infomsg, snap_name, namespace, deletion_status)
+
+        return True
 
     def list_snapshots(self, filesystem, fileset=None):
         """
