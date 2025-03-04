@@ -350,9 +350,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         """
         _, response = self.session.api.v2.account.accounts.get(pagination=True)
 
-        accounts = [(acc["name"], acc["id"]) for acc in response["data"] if acc["status"] == "Active"]
-
-        return accounts
+        return [(acc["name"], acc["id"]) for acc in response["data"] if acc["status"] == "Active"]
 
     def _validate_accounts(self, accounts):
         """
@@ -367,9 +365,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         elif not isinstance(accounts, list):
             accounts = [accounts]
 
-        valid_accounts = [acc[1] for acc in active_accounts if acc[0] in accounts]
-
-        return valid_accounts
+        return [acc[1] for acc in active_accounts if acc[0] in accounts]
 
     def _check_account_objapi_access(self):
         """
@@ -2044,9 +2040,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         filter_json = json.dumps([filter_json], separators=OCEANSTOR_JSON_SEP)
         _, response = self.session.api.v2.converged_service.snapshots.get(pagination=True, filter=filter_json)
 
-        snapshots = [snap["name"] for snap in response["data"]]
-
-        return snapshots
+        return [snap["name"] for snap in response["data"]]
 
     def _converged_service_snapshot_api(self, snap_name, namespace, delete=False):
         """
@@ -2097,9 +2091,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: string representing the name of the namespace
         @type snap_name: string representing the name of the new snapshot
         """
-        new_snap_status = self._converged_service_snapshot_api(snap_name, namespace)
-
-        return new_snap_status
+        return self._converged_service_snapshot_api(snap_name, namespace)
 
     def delete_namespace_snapshot(self, namespace, snap_name):
         """
@@ -2108,9 +2100,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         @type namespace: name of the filesystem of the snapshot to delete
         @type snap_name: string representing the name of the snapshot to delete
         """
-        del_snap_status = self._converged_service_snapshot_api(snap_name, namespace, delete=True)
-
-        return del_snap_status
+        return self._converged_service_snapshot_api(snap_name, namespace, delete=True)
 
     def list_snapshots(self, filesystem, fileset=None):
         """
@@ -2133,9 +2123,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         filter_json = json.dumps([filter_json], separators=OCEANSTOR_JSON_SEP)
         _, response = self.session.api.v2.file_service.snapshots.get(pagination=True, filter=filter_json)
 
-        snapshots = [snap["name"] for snap in response["data"]]
-
-        return snapshots
+        return [snap["name"] for snap in response["data"]]
 
     def _file_service_snapshot_api(self, snap_name, fs_name, fileset_name=None, delete=False):
         """
@@ -2226,9 +2214,7 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
             snapname = self._fileset_snapshot_name(fileset, snapname)
 
         # delete snapshot
-        del_snap_status = self._file_service_snapshot_api(snapname, fsname, fileset, delete=True)
-
-        return del_snap_status
+        return self._file_service_snapshot_api(snapname, fsname, fileset, delete=True)
 
     def _fileset_snapshot_name(self, fileset, snapshot_basename):
         """
