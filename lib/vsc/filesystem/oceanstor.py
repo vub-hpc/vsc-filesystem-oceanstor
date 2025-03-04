@@ -233,11 +233,11 @@ class OceanStorClient(Client):
             if "suggestion" in result:
                 ec_msg_desc += " " + result["suggestion"]
 
-        ec_full_msg = f"OceanStor query returned exit code: {exit_code} ({ec_msg_desc})"
         if exit_code != 0:
-            fancylogger.getLogger().raiseException(ec_full_msg, exception=RuntimeError)
+            err_msg = "OceanStor query returned non-zero exit code"
+            fancylogger.getLogger().raiseException((err_msg, exit_code, ec_msg_desc), exception=RuntimeError)
         else:
-            fancylogger.getLogger().debug(ec_full_msg)
+            fancylogger.getLogger().debug(f"OceanStor query is successful: {exit_code} ({ec_msg_desc})")
 
         return status, response
 
