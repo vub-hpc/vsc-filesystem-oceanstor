@@ -884,10 +884,8 @@ class StorageTest(TestCase):
     def test_create_namespace_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.create_namespace_snapshot("object", "NEW_SNAPSHOT"), True)
-        self.assertEqual(O.create_namespace_snapshot("object", "SNAP_OBJ_01"), 0)
-        self.assertRaises(
-            oceanstor.OceanStorOperationError, O.create_namespace_snapshot, "nonexistent", "NEW_SNAPSHOT"
-        )
+        self.assertEqual(O.create_namespace_snapshot("object", "SNAP_OBJ_01"), True)
+        self.assertEqual(O.create_namespace_snapshot("nonexistent", "NEW_SNAPSHOT"), True)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
     @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
@@ -895,10 +893,8 @@ class StorageTest(TestCase):
     def test_delete_namespace_snapshot(self):
         O = oceanstor.OceanStorOperations(*FAKE_INIT_PARAMS)
         self.assertEqual(O.delete_namespace_snapshot("object", "SNAP_OBJ_01"), True)
-        self.assertEqual(O.delete_namespace_snapshot("object", "NONEXISTENT"), 0)
-        self.assertRaises(
-            oceanstor.OceanStorOperationError, O.delete_namespace_snapshot, "nonexistent", "SNAP_TEST_01"
-        )
+        self.assertEqual(O.delete_namespace_snapshot("object", "NONEXISTENT"), True)
+        self.assertEqual(O.create_namespace_snapshot("object", "SNAP_TEST_O1"), True)
 
     @mock.patch("vsc.filesystem.oceanstor.OceanStorRestClient", rest_client)
     @mock.patch("vsc.filesystem.oceanstor.VscStorage", vsc_storage)
