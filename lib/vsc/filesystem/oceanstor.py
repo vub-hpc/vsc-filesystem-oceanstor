@@ -1744,9 +1744,15 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
                    kwargs["inode_hard"] = default_quota[0].filesLimit
                    kwargs["inode_soft"] = default_quota[0].filesQuota
                 except (KeyError, IndexError):
+                    # move along, not every object and type of quota has a default quota
                     self.log.warning(
                         f"setQuota: failed to retrieve default inode quotas from parent '{quota_parent}' "
-                        f"of '{quota_path}'"
+                        f"quota of '{quota_path}'"
+                    )
+                else:
+                    self.log.debug(
+                        f"setQuota: applying default inode limit of {kwargs['inode_hard']} "
+                        f"from parent '{quota_parent}' to new quota for '{who}' in '{quota_path}'"
                     )
             self._new_quota_api(quota_parent, typ=typ, who=who, **kwargs)
 
