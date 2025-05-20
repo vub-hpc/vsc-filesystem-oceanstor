@@ -1729,20 +1729,34 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
 
         # Check existing quotas on local object
         quota_parent, quotas = self._get_quota(who, obj, typ)
+        ostor_fs_id = quota_parent.split("@", 1)[0]
+        ostor_fs_name = next(iter(self.select_filesystems(ostor_fs_id, byid=True)))
 
         if quotas:
-            # local path already has quotas of given type
+            # local path already has requested quotas
             for quota_id in quotas:
                 self.log.debug("Sending request to update %s quota with ID: %s", typ, quota_id)
                 self._change_quota_api(quota_id, **kwargs)
         else:
-            # create new quota of given type
+            # create new quota for given local path
             self.log.debug("Sending request to create new %s quota for object ID: %s", typ, quota_parent)
+            # quotas without any limits on inodes take that limit from their default quota
+            if "inode_soft" not in kwargs or kwargs["inode_soft"] is None:
+                default_quota = [
+                    q for q in self.oceanstor_defaultquotas[ostor_fs_name][typ].values()
+                    if q.parentId == quota_parent
+                ]
+                try:
+                   kwargs["inode_hard"] = default_quota[0].filesLimit
+                   kwargs["inode_soft"] = default_quota[0].filesQuota
+                except (KeyError, IndexError):
+                    self.log.warning(
+                        f"setQuota: failed to retrieve default inode quotas from parent '{quota_parent}' "
+                        f"of '{quota_path}'"
+                    )
             self._new_quota_api(quota_parent, typ=typ, who=who, **kwargs)
 
         # Update quota list from this filesystem
-        ostor_fs_id = quota_parent.split("@", 1)[0]
-        ostor_fs_name = next(iter(self.select_filesystems(ostor_fs_id, byid=True)))
         self.list_quota(devices=ostor_fs_name, update=True)
 
     def _change_quota_api(self, quota_id, **kwargs):
