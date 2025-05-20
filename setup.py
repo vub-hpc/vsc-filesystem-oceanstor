@@ -40,7 +40,7 @@ install_requires = [
 ]
 
 PACKAGE = {
-    'version': '0.8.7',
+    'version': '0.9.1',
     'author': [ad],
     'maintainer': [ad],
     'setup_requires': ['vsc-install'],
