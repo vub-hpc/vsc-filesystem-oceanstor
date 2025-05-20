@@ -1709,12 +1709,6 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         quota_limits = {"soft": soft, "hard": hard, "inode_soft": inode_soft, "inode_hard": inode_hard}
         self._set_quota(who=fileset_name, obj=fileset_path, typ="fileset", **quota_limits)
 
-        # TODO: remove once OceanStor supports creating user quotas on non-empty filesets
-        # User quotas in VOs are temporarily frozen to 100% of VO fileset quota
-        if "brussel/vo" in fileset_path:
-            # Update default user quota in this VO to 100% of fileset quota
-            self._set_quota(who="*", obj=fileset_path, typ=Typ2Param.USR.value, **quota_limits)
-
     def _set_quota(self, who, obj, typ=Typ2Param.USR.value, **kwargs):
         """
         Set quota on a given local object.
