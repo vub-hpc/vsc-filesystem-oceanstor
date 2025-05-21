@@ -1703,12 +1703,6 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
         quota_limits = {"soft": soft, "hard": hard, "inode_soft": inode_soft, "inode_hard": inode_hard}
         self._set_quota(who=fileset_name, obj=fileset_path, typ="fileset", **quota_limits)
 
-        # TODO: remove once OceanStor supports creating user quotas on non-empty filesets
-        # User quotas in VOs are temporarily frozen to 100% of VO fileset quota
-        if "brussel/vo" in fileset_path:
-            # Update default user quota in this VO to 100% of fileset quota
-            self._set_quota(who="*", obj=fileset_path, typ=Typ2Param.USR.value, **quota_limits)
-
     def _set_quota(self, who, obj, typ=Typ2Param.USR.value, **kwargs):
         """
         Set quota on a given local object.
@@ -1729,20 +1723,40 @@ class OceanStorOperations(PosixOperations, metaclass=Singleton):
 
         # Check existing quotas on local object
         quota_parent, quotas = self._get_quota(who, obj, typ)
+        ostor_fs_id = quota_parent.split("@", 1)[0]
+        ostor_fs_name = next(iter(self.select_filesystems(ostor_fs_id, byid=True)))
 
         if quotas:
-            # local path already has quotas of given type
+            # local path already has requested quotas
             for quota_id in quotas:
                 self.log.debug("Sending request to update %s quota with ID: %s", typ, quota_id)
                 self._change_quota_api(quota_id, **kwargs)
         else:
-            # create new quota of given type
+            # create new quota for given local path
             self.log.debug("Sending request to create new %s quota for object ID: %s", typ, quota_parent)
+            # quotas without any limits on inodes take that limit from their default quota
+            if "inode_soft" not in kwargs or kwargs["inode_soft"] is None:
+                default_quota = [
+                    q for q in self.oceanstor_defaultquotas[ostor_fs_name][typ].values()
+                    if q.parentId == quota_parent
+                ]
+                try:
+                   kwargs["inode_hard"] = default_quota[0].filesLimit
+                   kwargs["inode_soft"] = default_quota[0].filesQuota
+                except (KeyError, IndexError):
+                    # move along, not every object and type of quota has a default quota
+                    self.log.warning(
+                        f"setQuota: failed to retrieve default inode quotas from parent '{quota_parent}' "
+                        f"quota of '{quota_path}'"
+                    )
+                else:
+                    self.log.debug(
+                        f"setQuota: applying default inode limit of {kwargs['inode_hard']} "
+                        f"from parent '{quota_parent}' to new quota for '{who}' in '{quota_path}'"
+                    )
             self._new_quota_api(quota_parent, typ=typ, who=who, **kwargs)
 
         # Update quota list from this filesystem
-        ostor_fs_id = quota_parent.split("@", 1)[0]
-        ostor_fs_name = next(iter(self.select_filesystems(ostor_fs_id, byid=True)))
         self.list_quota(devices=ostor_fs_name, update=True)
 
     def _change_quota_api(self, quota_id, **kwargs):
